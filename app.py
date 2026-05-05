@@ -280,7 +280,7 @@ if st.session_state.data_loaded and st.session_state.data is not None:
 if page == "🏠 Home":
     st.markdown("""
     <div class="main-header">
-        <h1>❤️ Heart Disease Prediction System</h1>
+        <h1>❤️ CardioInsight</h1>
         <p>Advanced Machine Learning for Early Detection & Prevention</p>
     </div>
     """, unsafe_allow_html=True)
