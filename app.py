@@ -17,7 +17,7 @@ warnings.filterwarnings('ignore')
 
 # Page configuration
 st.set_page_config(
-    page_title="CardioInsight ",
+    page_title="Heart Disease Prediction System",
     page_icon="❤️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -55,6 +55,14 @@ st.markdown("""
         color: #333;
         text-align: center;
     }
+    .disclaimer {
+        background: #f8d7da;
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 4px solid #dc3545;
+        margin: 1rem 0;
+        font-size: 0.9rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -76,7 +84,7 @@ if 'feature_names' not in st.session_state:
 st.sidebar.title("🔍 Navigation")
 page = st.sidebar.radio(
     "Go to",
-    ["🏠 Home", "❤️ Prediction", "📊 Visualizations", "🧪 Model Comparison", "ℹ️ About"]
+    ["🏠 Home", "❤️ Prediction", "⚡ Quick Prediction", "📊 Visualizations", "🧪 Model Comparison", "ℹ️ About"]
 )
 
 # Sidebar info
@@ -280,7 +288,7 @@ if st.session_state.data_loaded and st.session_state.data is not None:
 if page == "🏠 Home":
     st.markdown("""
     <div class="main-header">
-        <h1>❤️ CardioInsight</h1>
+        <h1>❤️ Heart Disease Prediction System</h1>
         <p>Advanced Machine Learning for Early Detection & Prevention</p>
     </div>
     """, unsafe_allow_html=True)
@@ -295,6 +303,7 @@ if page == "🏠 Home":
         
         **Key Features:**
         - 🔮 Real-time risk prediction
+        - ⚡ Quick prediction with basic parameters
         - 📊 Interactive visualizations
         - 🤖 Multiple optimized ML models
         - 💡 Personalized recommendations
@@ -352,12 +361,12 @@ if page == "🏠 Home":
         st.markdown("#### 3️⃣ Get Results")
         st.markdown("Receive risk assessment and health recommendations")
 
-# ==================== PREDICTION PAGE ====================
+# ==================== PREDICTION PAGE (Detailed) ====================
 elif page == "❤️ Prediction":
     st.markdown("""
     <div class="main-header">
-        <h1>❤️ Heart Disease Risk Prediction</h1>
-        <p>Enter patient information for risk assessment</p>
+        <h1>❤️ Detailed Heart Disease Risk Prediction</h1>
+        <p>Enter complete patient information for accurate risk assessment</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -514,6 +523,206 @@ elif page == "❤️ Prediction":
                     """)
             except Exception as e:
                 st.error(f"Error during prediction: {str(e)}")
+        
+        # Disclaimer after prediction
+        st.markdown("---")
+        st.markdown("""
+        <div class="disclaimer">
+            <strong>⚠️ Medical Disclaimer:</strong> This is an AI-powered screening tool for educational purposes only. 
+            It does not replace professional medical advice, diagnosis, or treatment. Always consult with a qualified 
+            healthcare provider for medical decisions. The predictions are based on machine learning models and 
+            should be used as a reference only, not as a definitive diagnosis.
+        </div>
+        """, unsafe_allow_html=True)
+
+# ==================== QUICK PREDICTION PAGE ====================
+elif page == "⚡ Quick Prediction":
+    st.markdown("""
+    <div class="main-header">
+        <h1>⚡ Quick Heart Disease Risk Assessment</h1>
+        <p>Enter basic health parameters for a quick risk check</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if not st.session_state.models_trained:
+        st.warning("⚠️ Models are not trained yet. Please wait for data processing.")
+    else:
+        st.markdown("### 📝 Quick Health Check")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            age = st.number_input("Age (years)", min_value=20, max_value=100, value=50, key="quick_age")
+            sex = st.selectbox("Gender", ["Male", "Female"], key="quick_sex")
+            heart_rate = st.number_input("Heart Rate (beats per minute)", min_value=40, max_value=200, value=75, key="quick_hr")
+            cholesterol = st.number_input("Cholesterol Level (mg/dl)", min_value=100, max_value=600, value=200, key="quick_chol")
+        
+        with col2:
+            weight_kg = st.number_input("Weight (kg)", min_value=30, max_value=200, value=70, key="quick_weight")
+            # BMI calculation
+            height_m = st.number_input("Height (m) - for BMI calculation", min_value=1.0, max_value=2.5, value=1.7, step=0.01, key="quick_height")
+            bmi = weight_kg / (height_m ** 2)
+            st.metric("BMI", f"{bmi:.1f}")
+            
+            # Additional basic parameters
+            blood_pressure = st.selectbox("Blood Pressure Category", 
+                                         ["Normal (<120/80)", "Elevated (120-129/80)", "High BP Stage 1 (130-139/80-89)", 
+                                          "High BP Stage 2 (140+/90+)", "Hypertensive Crisis (>180/120)"])
+            exercise = st.selectbox("Regular Exercise", ["Yes", "No"], key="quick_exercise")
+        
+        st.markdown("---")
+        selected_quick_model = st.selectbox(
+            "Select Model for Quick Prediction",
+            ["Random Forest", "Logistic Regression", "Gradient Boosting", "SVM"],
+            key="quick_model"
+        )
+        
+        if st.button("⚡ Get Quick Risk Assessment", use_container_width=True, key="quick_predict"):
+            try:
+                # Convert basic inputs to match model features
+                sex_num = 1 if sex == "Male" else 0
+                exercise_num = 1 if exercise == "Yes" else 0
+                
+                # Blood pressure to numeric mapping
+                bp_mapping = {
+                    "Normal (<120/80)": 110,
+                    "Elevated (120-129/80)": 125,
+                    "High BP Stage 1 (130-139/80-89)": 135,
+                    "High BP Stage 2 (140+/90+)": 150,
+                    "Hypertensive Crisis (>180/120)": 180
+                }
+                estimated_bp = bp_mapping[blood_pressure]
+                
+                # Estimate other parameters based on quick inputs
+                estimated_max_hr = 220 - age  # Standard formula
+                
+                # Default values for parameters not provided
+                cp_num = 1  # Default to NAP (Non-anginal Pain)
+                fasting_bs_num = 0  # Default to No
+                resting_ecg_num = 0  # Default to Normal
+                oldpeak = 0.5
+                st_slope_num = 1  # Default to Flat
+                
+                # Create input array
+                input_data = np.array([[age, sex_num, cp_num, estimated_bp, cholesterol, 
+                                        fasting_bs_num, resting_ecg_num, estimated_max_hr, 
+                                        exercise_num, oldpeak, st_slope_num]])
+                
+                # Scale input
+                input_scaled = st.session_state.scaler.transform(input_data)
+                
+                # Make prediction
+                model = st.session_state.models[selected_quick_model]
+                prediction = model.predict(input_scaled)[0]
+                
+                if hasattr(model, 'predict_proba'):
+                    probability = model.predict_proba(input_scaled)[0][1]
+                else:
+                    probability = None
+                
+                # Display quick results
+                st.markdown("---")
+                st.markdown("## ⚡ Quick Assessment Results")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if prediction == 1:
+                        st.markdown("""
+                        <div class="risk-high">
+                            <h2>⚠️ HIGH RISK</h2>
+                            <p>Possible Heart Disease Risk Detected</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        st.markdown("""
+                        **Based on your quick assessment:**
+                        - Age: {} years
+                        - {} • Heart Rate: {} bpm
+                        - Cholesterol: {} mg/dl
+                        - BMI: {:.1f}
+                        
+                        **🚨 Recommendation:** Please consult a healthcare professional for a complete evaluation.
+                        """.format(age, sex, heart_rate, cholesterol, bmi))
+                    else:
+                        st.markdown("""
+                        <div class="risk-low">
+                            <h2>✅ LOW RISK</h2>
+                            <p>Low Risk of Heart Disease Detected</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        st.markdown("""
+                        **Based on your quick assessment:**
+                        - Age: {} years
+                        - {} • Heart Rate: {} bpm
+                        - Cholesterol: {} mg/dl
+                        - BMI: {:.1f}
+                        
+                        **💚 Good News:** Your quick assessment shows low risk. Continue healthy habits!
+                        """.format(age, sex, heart_rate, cholesterol, bmi))
+                
+                with col2:
+                    if probability is not None:
+                        risk_level = probability * 100
+                        
+                        fig = go.Figure(go.Indicator(
+                            mode="gauge",
+                            value=risk_level,
+                            title={"text": "Risk Score"},
+                            gauge={
+                                "axis": {"range": [0, 100]},
+                                "bar": {"color": "darkred" if risk_level > 70 else "orange" if risk_level > 40 else "green"},
+                                "steps": [
+                                    {"range": [0, 40], "color": "#d4edda"},
+                                    {"range": [40, 70], "color": "#fff3cd"},
+                                    {"range": [70, 100], "color": "#f8d7da"}
+                                ]
+                            }
+                        ))
+                        fig.update_layout(height=300)
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        if risk_level > 70:
+                            st.markdown("🔴 **Risk Level: High** - Schedule a checkup soon")
+                        elif risk_level > 40:
+                            st.markdown("🟡 **Risk Level: Medium** - Monitor your health closely")
+                        else:
+                            st.markdown("🟢 **Risk Level: Low** - Maintain healthy lifestyle")
+                
+                # Quick health tips
+                st.markdown("---")
+                st.markdown("### 💡 Quick Health Tips")
+                
+                if bmi > 30:
+                    st.warning("⚠️ Your BMI indicates obesity. Consider consulting a nutritionist.")
+                elif bmi > 25:
+                    st.info("📊 Your BMI is in overweight range. Regular exercise can help.")
+                else:
+                    st.success("✅ Your BMI is in healthy range. Keep it up!")
+                
+                if cholesterol > 240:
+                    st.warning("⚠️ High cholesterol detected. Consider dietary changes.")
+                elif cholesterol > 200:
+                    st.info("📊 Borderline cholesterol. Monitor your diet.")
+                
+                if heart_rate > 100:
+                    st.warning("⚠️ Elevated heart rate. Consider relaxation techniques.")
+                elif heart_rate < 60 and age < 60:
+                    st.info("📊 Low heart rate. Consult a doctor if you experience symptoms.")
+                
+            except Exception as e:
+                st.error(f"Error during quick prediction: {str(e)}")
+        
+        # Disclaimer for quick prediction
+        st.markdown("---")
+        st.markdown("""
+        <div class="disclaimer">
+            <strong>⚠️ Quick Assessment Disclaimer:</strong> This quick assessment uses estimated values based on limited inputs 
+            and is for screening purposes only. Results may not be as accurate as the detailed prediction. 
+            Always consult a healthcare professional for proper medical advice and diagnosis.
+        </div>
+        """, unsafe_allow_html=True)
 
 # ==================== VISUALIZATIONS PAGE ====================
 elif page == "📊 Visualizations":
@@ -600,6 +809,15 @@ elif page == "📊 Visualizations":
                 st.plotly_chart(fig, use_container_width=True)
     else:
         st.warning("No data loaded. Please upload a dataset.")
+    
+    # Disclaimer for visualizations
+    st.markdown("---")
+    st.markdown("""
+    <div class="disclaimer">
+        <strong>⚠️ Disclaimer:</strong> These visualizations are based on the provided dataset and are for informational 
+        and educational purposes only. They do not constitute medical advice or diagnosis.
+    </div>
+    """, unsafe_allow_html=True)
 
 # ==================== MODEL COMPARISON PAGE ====================
 elif page == "🧪 Model Comparison":
@@ -712,8 +930,15 @@ elif page == "🧪 Model Comparison":
         }
         
         st.success(recommendations.get(best_model, f"🏆 Best Model: {best_model} with {best_accuracy:.3f} accuracy"))
-    else:
-        st.warning("No results available. Please check the data and retrain models.")
+    
+    # Disclaimer for model comparison
+    st.markdown("---")
+    st.markdown("""
+    <div class="disclaimer">
+        <strong>⚠️ Disclaimer:</strong> Model performance metrics are based on the provided dataset and cross-validation. 
+        Real-world performance may vary. These results are for educational and comparison purposes only.
+    </div>
+    """, unsafe_allow_html=True)
 
 # ==================== ABOUT PAGE ====================
 else:
@@ -808,16 +1033,22 @@ else:
     - Streamlit Documentation
     """)
     
-    st.info("""
-    💡 **Note:** This system is for educational purposes only. 
-    Always consult healthcare professionals for medical advice.
-    """)
+    # Final disclaimer
+    st.markdown("""
+    <div class="disclaimer">
+        <strong>⚠️ IMPORTANT MEDICAL DISCLAIMER:</strong> This system is for educational and research purposes only. 
+        It is not a substitute for professional medical advice, diagnosis, or treatment. Never disregard professional 
+        medical advice or delay seeking it because of information provided by this system. The predictions made by 
+        this system should not be used as the sole basis for any medical decision. Always consult with a qualified 
+        healthcare provider for proper medical evaluation and treatment.
+    </div>
+    """, unsafe_allow_html=True)
 
-# Footer
+# Global disclaimer at the bottom of every page
 st.markdown("---")
 st.markdown("""
-<div style="text-align: center; color: #666; padding: 1rem;">
-    <p>❤️ Heart Disease Prediction System | Data Science Final Year Project</p>
-    <p style="font-size: 0.8rem;">Powered by Machine Learning | For Educational Purposes Only</p>
+<div style="background: #f8d7da; padding: 0.8rem; border-radius: 8px; margin-top: 1rem; text-align: center; font-size: 0.85rem;">
+    <strong>⚠️ Medical Disclaimer:</strong> This is an AI-powered screening tool for educational purposes only. 
+    Always consult with a qualified healthcare provider for medical decisions.
 </div>
 """, unsafe_allow_html=True)
