@@ -17,7 +17,7 @@ warnings.filterwarnings('ignore')
 
 # Page configuration
 st.set_page_config(
-    page_title="Heart Disease Prediction System",
+    page_title="Heartlytics",
     page_icon="❤️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -73,10 +73,10 @@ if 'feature_names' not in st.session_state:
     st.session_state.feature_names = None
 
 # Sidebar Navigation
-st.sidebar.title("🔍 Navigation")
+st.sidebar.title("🔍 Explore")
 page = st.sidebar.radio(
     "Go to",
-    ["🏠 Home", "❤️ Prediction", "📊 Visualizations", "🧪 Model Comparison", "ℹ️ About"]
+    ["🏠 CardioHome", "❤️ Prediction", "📊 CardioScope", "🧪 ModelMatch", "ℹ️ About"]
 )
 
 # Sidebar info
