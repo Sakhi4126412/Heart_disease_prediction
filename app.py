@@ -4,16 +4,15 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import train_test_train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.linear_model import LogisticRegression
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report, confusion_matrix, roc_auc_score, roc_curve
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -25,866 +24,774 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for medical-friendly styling
+# Custom CSS for better UI
 st.markdown("""
 <style>
-    /* Main background */
-    .stApp {
-        background: linear-gradient(135deg, #f0f7f0 0%, #e5f0e5 100%);
-    }
-    
-    /* Header styling */
     .main-header {
-        background: linear-gradient(135deg, #1e5a1e 0%, #2d7a2d 100%);
-        padding: 2rem;
-        border-radius: 15px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 1.5rem;
+        border-radius: 10px;
         color: white;
         text-align: center;
         margin-bottom: 2rem;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        animation: slideIn 0.5s ease-out;
     }
-    
-    @keyframes slideIn {
-        from {
-            transform: translateY(-20px);
-            opacity: 0;
-        }
-        to {
-            transform: translateY(0);
-            opacity: 1;
-        }
-    }
-    
-    .main-header h1 {
-        margin: 0;
-        font-size: 2.5rem;
-        font-weight: bold;
-    }
-    
-    .main-header p {
-        margin: 0.5rem 0 0 0;
-        font-size: 1.1rem;
-        opacity: 0.9;
-    }
-    
-    /* Card styling */
-    .metric-card {
-        background: white;
-        padding: 1.2rem;
+    .risk-high {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        padding: 1rem;
         border-radius: 10px;
+        color: white;
         text-align: center;
-        border: 1px solid #c8e0c8;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        transition: transform 0.2s;
     }
-    
-    .metric-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }
-    
-    .metric-value {
-        font-size: 2rem;
-        font-weight: bold;
-        color: #1e5a1e;
-    }
-    
-    .metric-label {
-        font-size: 0.9rem;
-        color: #555;
-        margin-top: 0.5rem;
-    }
-    
-    /* Button styling */
-    .stButton > button {
-        background: linear-gradient(135deg, #1e5a1e 0%, #2d7a2d 100%);
+    .risk-medium {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        padding: 1rem;
+        border-radius: 10px;
         color: white;
-        border: none;
-        padding: 0.6rem 2rem;
-        border-radius: 8px;
-        font-weight: bold;
-        transition: all 0.3s;
-        width: 100%;
+        text-align: center;
     }
-    
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    }
-    
-    /* Message styling */
-    .success-message {
-        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-        color: #155724;
+    .risk-low {
+        background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
         padding: 1rem;
-        border-radius: 8px;
-        border-left: 4px solid #28a745;
-        margin: 1rem 0;
-        animation: fadeIn 0.5s;
+        border-radius: 10px;
+        color: #333;
+        text-align: center;
     }
-    
-    .warning-message {
-        background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%);
-        color: #856404;
-        padding: 1rem;
-        border-radius: 8px;
-        border-left: 4px solid #ffc107;
-        margin: 1rem 0;
-        animation: fadeIn 0.5s;
-    }
-    
     .info-box {
-        background: #e7f3ff;
+        background: #f0f2f6;
         padding: 1rem;
-        border-radius: 8px;
-        border-left: 4px solid #2196f3;
+        border-radius: 10px;
         margin: 1rem 0;
     }
-    
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    /* Tabs styling */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
+    .feature-importance {
         background: white;
-        border-radius: 8px;
-        padding: 8px 16px;
-        font-weight: 500;
-    }
-    
-    .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #1e5a1e 0%, #2d7a2d 100%);
-        color: white;
+        padding: 1rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 </style>
 """, unsafe_allow_html=True)
 
 # Initialize session state
-if 'data_loaded' not in st.session_state:
-    st.session_state.data_loaded = False
-if 'models_trained' not in st.session_state:
-    st.session_state.models_trained = False
+if 'model_trained' not in st.session_state:
+    st.session_state.model_trained = False
+if 'data' not in st.session_state:
+    st.session_state.data = None
 
-# Header
-st.markdown("""
-<div class="main-header">
-    <h1>❤️ Heart Disease Prediction System</h1>
-    <p>Advanced AI-Powered Early Detection & Risk Assessment Platform</p>
-    <p style="font-size: 0.9rem; margin-top: 10px;">🏥 Clinical Decision Support System</p>
-</div>
-""", unsafe_allow_html=True)
+# Sidebar Navigation
+st.sidebar.title("🔍 Navigation")
+page = st.sidebar.radio(
+    "Go to",
+    ["🏠 Home", "❤️ Prediction", "📊 Visualizations", "🧪 Model Comparison", "ℹ️ About"]
+)
 
-# Sidebar
-with st.sidebar:
-    st.markdown("### 📂 Data Management")
+# Sidebar info
+st.sidebar.markdown("---")
+st.sidebar.info(
+    "**Heart Disease Prediction System**\n\n"
+    "Using Machine Learning to predict heart disease risk based on clinical parameters."
+)
+
+# Load default dataset function
+@st.cache_data
+def load_default_data():
+    # Create sample data if no file uploaded
+    data = pd.DataFrame({
+        'age': [52, 53, 54, 55, 56, 57, 58, 59, 60, 61],
+        'sex': [1, 1, 1, 0, 1, 0, 1, 0, 1, 1],
+        'cp': [0, 1, 2, 3, 0, 1, 2, 3, 0, 1],
+        'trestbps': [125, 140, 130, 132, 148, 140, 120, 130, 140, 128],
+        'chol': [212, 203, 256, 234, 284, 206, 234, 284, 294, 308],
+        'fbs': [0, 1, 0, 0, 0, 0, 0, 1, 0, 0],
+        'restecg': [1, 0, 1, 1, 0, 1, 0, 1, 0, 1],
+        'thalach': [168, 155, 150, 140, 142, 155, 146, 138, 112, 145],
+        'exang': [0, 1, 0, 0, 1, 0, 0, 1, 0, 0],
+        'oldpeak': [1.2, 1.5, 2.3, 0.8, 1.4, 1.6, 0.5, 2.0, 1.8, 2.2],
+        'slope': [2, 1, 2, 2, 1, 2, 2, 1, 2, 2],
+        'ca': [0, 0, 1, 0, 1, 0, 0, 2, 0, 1],
+        'thal': [2, 3, 2, 2, 3, 2, 2, 3, 2, 2],
+        'target': [0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
+    })
+    return data
+
+# File upload section
+st.sidebar.markdown("---")
+st.sidebar.subheader("📂 Data Upload")
+uploaded_file = st.sidebar.file_uploader("Upload your CSV file", type=['csv'])
+
+if uploaded_file is not None:
+    try:
+        data = pd.read_csv(uploaded_file)
+        st.session_state.data = data
+        st.sidebar.success(f"✅ Loaded {len(data)} records!")
+    except Exception as e:
+        st.sidebar.error(f"Error loading file: {e}")
+        data = load_default_data()
+        st.session_state.data = data
+        st.sidebar.info("Using default dataset")
+else:
+    data = load_default_data()
+    st.session_state.data = data
+    st.sidebar.info("📊 Using default dataset")
+
+# Data preprocessing function
+def preprocess_data(df):
+    df_processed = df.copy()
     
-    # Data import section
-    uploaded_file = st.file_uploader(
-        "Upload CSV Dataset", 
-        type=['csv'], 
-        help="Upload your heart disease dataset in CSV format"
+    # Handle missing values
+    df_processed = df_processed.fillna(df_processed.median())
+    
+    # Separate features and target
+    if 'target' in df_processed.columns:
+        X = df_processed.drop('target', axis=1)
+        y = df_processed['target']
+    else:
+        X = df_processed
+        y = None
+    
+    # Scale features
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    return X_scaled, y, scaler, X.columns
+
+# Train models
+def train_models(X, y):
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
     )
     
-    use_sample = st.checkbox("Use Sample Dataset", value=True)
+    models = {
+        'Logistic Regression': LogisticRegression(random_state=42, max_iter=1000),
+        'Random Forest': RandomForestClassifier(random_state=42, n_estimators=100),
+        'SVM': SVC(random_state=42, probability=True)
+    }
     
-    if uploaded_file is not None:
-        try:
-            data = pd.read_csv(uploaded_file)
-            st.session_state.data = data
-            st.session_state.data_loaded = True
-            st.success(f"✅ {len(data)} records loaded successfully!")
-            use_sample = False
-        except Exception as e:
-            st.error(f"Error loading file: {str(e)}")
-            data = None
-            st.session_state.data_loaded = False
-    elif use_sample:
-        # Create comprehensive sample data
-        sample_data = """Age,Sex,ChestPainType,RestingBP,Cholesterol,FastingBS,RestingECG,MaxHR,ExerciseAngina,Oldpeak,ST_Slope,HeartDisease
-40,M,ATA,140,289,0,Normal,172,N,0,Up,0
-49,F,NAP,160,180,0,Normal,156,N,1,Flat,1
-37,M,ATA,130,283,0,ST,98,N,0,Up,0
-48,F,ASY,138,214,0,Normal,108,Y,1.5,Flat,1
-54,M,NAP,150,195,0,Normal,122,N,0,Up,0
-39,M,NAP,120,339,0,Normal,170,N,0,Up,0
-45,F,ATA,130,237,0,Normal,170,N,0,Up,0
-54,M,ATA,110,208,0,Normal,142,N,0,Up,0
-37,M,ASY,140,207,0,Normal,130,Y,1.5,Flat,1
-48,F,ATA,120,284,0,Normal,120,N,0,Up,0
-37,F,NAP,130,211,0,Normal,142,N,0,Up,0
-58,M,ATA,136,164,0,ST,99,Y,2,Flat,1
-39,M,ATA,120,204,0,Normal,145,N,0,Up,0
-49,M,ASY,140,234,0,Normal,140,Y,1,Flat,1
-42,F,NAP,115,211,0,ST,137,N,0,Up,0"""
-        
-        from io import StringIO
-        data = pd.read_csv(StringIO(sample_data))
-        st.session_state.data = data
-        st.session_state.data_loaded = True
-        st.info(f"📊 Using sample dataset with {len(data)} records")
-    else:
-        st.warning("⚠️ Please upload data or use sample dataset")
-        st.stop()
+    trained_models = {}
+    results = {}
     
-    if st.session_state.data_loaded:
-        st.markdown("---")
-        st.markdown("### 🤖 Model Configuration")
+    for name, model in models.items():
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+        accuracy = accuracy_score(y_test, y_pred)
         
-        # Model selection
-        models_to_train = st.multiselect(
-            "Select ML Models for Training",
-            options=['Logistic Regression', 'K-Nearest Neighbors', 'Decision Tree', 
-                     'Random Forest', 'Gradient Boosting', 'SVM'],
-            default=['Logistic Regression', 'Random Forest'],
-            help="Select one or more models to train and compare"
-        )
-        
-        st.markdown("---")
-        st.markdown("### ⚙️ Training Parameters")
-        
-        test_size = st.slider("Test Set Size", 0.1, 0.4, 0.2, 0.05, help="Proportion of data for testing")
-        random_state = st.number_input("Random Seed", value=42, step=1, help="For reproducible results")
-        cv_folds = st.slider("Cross-Validation Folds", 3, 10, 5, help="Number of CV folds")
-        
-        st.markdown("---")
-        st.markdown("### 📈 Dataset Statistics")
-        
-        if 'data' in st.session_state:
-            df = st.session_state.data
-            st.metric("Total Records", len(df))
-            st.metric("Features", len(df.columns) - 1)
-            if 'HeartDisease' in df.columns:
-                disease_pct = (df['HeartDisease'].sum() / len(df)) * 100
-                st.metric("Disease Prevalence", f"{disease_pct:.1f}%")
-        
-        st.markdown("---")
-        st.markdown("### ℹ️ About")
-        st.markdown("""
-        **Clinical Features:**
-        - Age & Gender
-        - Chest Pain Type
-        - Resting BP & Cholesterol
-        - Fasting Blood Sugar
-        - Resting ECG
-        - Max Heart Rate
-        - Exercise Angina
-        - ST Depression
-        - ST Slope
-        
-        **Target:** Heart Disease (0=No, 1=Yes)
-        """)
+        trained_models[name] = model
+        results[name] = {
+            'accuracy': accuracy,
+            'model': model,
+            'predictions': y_pred,
+            'y_test': y_test
+        }
+    
+    return trained_models, results, X_train, X_test, y_train, y_test
 
-# Main content area
-if st.session_state.data_loaded:
-    data = st.session_state.data
+# Train models if not already trained
+if st.session_state.data is not None:
+    X_scaled, y, scaler, feature_names = preprocess_data(st.session_state.data)
+    if y is not None:
+        models, results, X_train, X_test, y_train, y_test = train_models(X_scaled, y)
+
+# ==================== HOME PAGE ====================
+if page == "🏠 Home":
+    st.markdown("""
+    <div class="main-header">
+        <h1>❤️ Heart Disease Prediction System</h1>
+        <p>Advanced Machine Learning for Early Detection & Prevention</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Data Overview Section
-    st.markdown("## 📊 Clinical Data Overview")
-    
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{len(data)}</div>
-            <div class="metric-label">Total Patients</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("### 🎯 Project Overview")
+        st.markdown("""
+        This system uses **Machine Learning** to predict the risk of heart disease based on 
+        clinical parameters. Early detection can significantly improve patient outcomes.
+        
+        **Key Features:**
+        - 🔮 Real-time risk prediction
+        - 📊 Interactive visualizations
+        - 🤖 Multiple ML models
+        - 💡 Personalized recommendations
+        """)
+        
+        st.markdown("### 🧠 Machine Learning Models")
+        st.markdown("""
+        Three powerful algorithms are implemented:
+        
+        1. **Logistic Regression** - Baseline statistical model
+        2. **Random Forest** - Ensemble learning for better accuracy
+        3. **Support Vector Machine (SVM)** - Effective for high-dimensional data
+        """)
     
     with col2:
+        st.markdown("### 📊 Dataset Information")
         st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-value">{len(data.columns) - 1}</div>
-            <div class="metric-label">Clinical Features</div>
-        </div>
-        """, unsafe_allow_html=True)
+        **Total Records:** {len(st.session_state.data)}  
+        **Features:** {len(st.session_state.data.columns) - 1} clinical parameters  
+        **Target Variable:** Heart Disease (0 = No, 1 = Yes)
+        
+        **Clinical Features:**
+        - Age, Sex, Chest Pain Type
+        - Resting Blood Pressure, Cholesterol
+        - Fasting Blood Sugar, Resting ECG
+        - Max Heart Rate, Exercise Angina
+        - ST Depression, Slope, CA, Thal
+        """)
+        
+        if 'target' in st.session_state.data.columns:
+            disease_count = st.session_state.data['target'].sum()
+            healthy_count = len(st.session_state.data) - disease_count
+            st.markdown(f"""
+            **Target Distribution:**
+            - ❤️ Disease: {disease_count} ({disease_count/len(st.session_state.data)*100:.1f}%)
+            - 💚 Healthy: {healthy_count} ({healthy_count/len(st.session_state.data)*100:.1f}%)
+            """)
+    
+    st.markdown("---")
+    st.markdown("### 🚀 How It Works")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("#### 1️⃣ Input Data")
+        st.markdown("Enter patient clinical parameters through the sidebar")
+    
+    with col2:
+        st.markdown("#### 2️⃣ Model Prediction")
+        st.markdown("AI models analyze the data and predict risk level")
     
     with col3:
-        if 'HeartDisease' in data.columns:
-            disease_count = data['HeartDisease'].sum()
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-value">{disease_count}</div>
-                <div class="metric-label">Disease Cases</div>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown("#### 3️⃣ Get Results")
+        st.markdown("Receive risk assessment and health recommendations")
     
-    with col4:
-        if 'HeartDisease' in data.columns:
-            healthy_count = len(data) - data['HeartDisease'].sum()
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-value">{healthy_count}</div>
-                <div class="metric-label">Healthy Cases</div>
-            </div>
-            """, unsafe_allow_html=True)
+    st.markdown("---")
+    st.info("💡 **Tip:** Navigate to the 'Prediction' page to test the system with patient data!")
+
+# ==================== PREDICTION PAGE ====================
+elif page == "❤️ Prediction":
+    st.markdown("""
+    <div class="main-header">
+        <h1>❤️ Heart Disease Risk Prediction</h1>
+        <p>Enter patient information for risk assessment</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Tabs for different sections
-    tab_overview, tab_eda, tab_training, tab_prediction = st.tabs([
-        "📋 Dataset Preview", "📈 Exploratory Analysis", "🤖 Model Training", "🔮 Predictions"
-    ])
+    st.markdown("### 📝 Patient Clinical Data")
     
-    # Tab 1: Dataset Preview
-    with tab_overview:
-        st.markdown("### Patient Records Preview")
-        st.dataframe(data.head(20), use_container_width=True)
+    # Create input columns
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        age = st.number_input("Age (years)", min_value=20, max_value=100, value=50)
+        sex = st.selectbox("Sex", ["Male", "Female"])
+        cp = st.selectbox("Chest Pain Type", 
+                         ["Typical Angina", "Atypical Angina", "Non-anginal Pain", "Asymptomatic"])
+        trestbps = st.number_input("Resting Blood Pressure (mm Hg)", min_value=80, max_value=200, value=120)
+    
+    with col2:
+        chol = st.number_input("Cholesterol (mg/dl)", min_value=100, max_value=600, value=200)
+        fbs = st.selectbox("Fasting Blood Sugar > 120 mg/dl", ["No", "Yes"])
+        restecg = st.selectbox("Resting ECG Results", ["Normal", "ST-T Abnormality", "LV Hypertrophy"])
+        thalach = st.number_input("Maximum Heart Rate", min_value=60, max_value=220, value=150)
+    
+    with col3:
+        exang = st.selectbox("Exercise Induced Angina", ["No", "Yes"])
+        oldpeak = st.number_input("ST Depression (Oldpeak)", min_value=0.0, max_value=6.0, value=1.0, step=0.1)
+        slope = st.selectbox("ST Slope", ["Upsloping", "Flat", "Downsloping"])
+        ca = st.number_input("Number of Major Vessels (0-3)", min_value=0, max_value=3, value=0)
+        thal = st.selectbox("Thalassemia", ["Normal", "Fixed Defect", "Reversible Defect"])
+    
+    # Convert categorical to numeric
+    sex_num = 1 if sex == "Male" else 0
+    cp_num = {"Typical Angina": 0, "Atypical Angina": 1, "Non-anginal Pain": 2, "Asymptomatic": 3}[cp]
+    fbs_num = 1 if fbs == "Yes" else 0
+    restecg_num = {"Normal": 0, "ST-T Abnormality": 1, "LV Hypertrophy": 2}[restecg]
+    exang_num = 1 if exang == "Yes" else 0
+    slope_num = {"Upsloping": 0, "Flat": 1, "Downsloping": 2}[slope]
+    thal_num = {"Normal": 1, "Fixed Defect": 2, "Reversible Defect": 3}[thal]
+    
+    # Model selection
+    st.markdown("---")
+    selected_model = st.selectbox(
+        "Select Model for Prediction",
+        ["Logistic Regression", "Random Forest", "SVM"]
+    )
+    
+    if st.button("🔮 Predict Heart Disease Risk", use_container_width=True):
+        # Create input array
+        input_data = np.array([[age, sex_num, cp_num, trestbps, chol, fbs_num, 
+                                restecg_num, thalach, exang_num, oldpeak, slope_num, ca, thal_num]])
+        
+        # Scale input
+        input_scaled = scaler.transform(input_data)
+        
+        # Make prediction
+        model = models[selected_model]
+        prediction = model.predict(input_scaled)[0]
+        
+        if hasattr(model, 'predict_proba'):
+            probability = model.predict_proba(input_scaled)[0][1]
+        else:
+            probability = None
+        
+        # Display results
+        st.markdown("---")
+        st.markdown("## 📊 Prediction Results")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("#### 📊 Numerical Features Statistics")
-            numeric_cols = data.select_dtypes(include=[np.number]).columns
-            st.dataframe(data[numeric_cols].describe(), use_container_width=True)
+            if prediction == 1:
+                st.markdown("""
+                <div class="risk-high">
+                    <h2>⚠️ HIGH RISK</h2>
+                    <p>Heart Disease Detected</p>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div class="risk-low">
+                    <h2>✅ LOW RISK</h2>
+                    <p>No Heart Disease Detected</p>
+                </div>
+                """, unsafe_allow_html=True)
         
         with col2:
-            st.markdown("#### 🏷️ Categorical Features Distribution")
-            categorical_cols = data.select_dtypes(include=['object']).columns
-            for col in categorical_cols:
-                st.write(f"**{col}:**")
-                st.write(data[col].value_counts())
-                st.write("---")
-    
-    # Tab 2: Exploratory Data Analysis
-    with tab_eda:
-        st.markdown("### Exploratory Data Analysis")
+            if probability is not None:
+                risk_level = probability * 100
+                
+                # Determine risk level color
+                if risk_level > 70:
+                    risk_color = "🔴 High Risk"
+                    risk_class = "risk-high"
+                elif risk_level > 40:
+                    risk_color = "🟡 Medium Risk"
+                    risk_class = "risk-medium"
+                else:
+                    risk_color = "🟢 Low Risk"
+                    risk_class = "risk-low"
+                
+                st.markdown(f"""
+                <div class="{risk_class}">
+                    <h3>Risk Score</h3>
+                    <h1>{risk_level:.1f}%</h1>
+                    <p>{risk_color}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Risk meter
+                fig = go.Figure(go.Indicator(
+                    mode="gauge",
+                    value=risk_level,
+                    title={"text": "Risk Level"},
+                    gauge={
+                        "axis": {"range": [0, 100]},
+                        "bar": {"color": "darkred" if risk_level > 70 else "orange" if risk_level > 40 else "green"},
+                        "steps": [
+                            {"range": [0, 40], "color": "#d4edda"},
+                            {"range": [40, 70], "color": "#fff3cd"},
+                            {"range": [70, 100], "color": "#f8d7da"}
+                        ]
+                    }
+                ))
+                fig.update_layout(height=250)
+                st.plotly_chart(fig, use_container_width=True)
         
-        # Visualization type selector
-        viz_type = st.radio(
-            "Select Visualization Type",
-            ["Distribution Analysis", "Correlation Analysis", "Comparative Analysis"],
-            horizontal=True
-        )
+        # Explain Prediction with Feature Importance
+        st.markdown("---")
+        st.markdown("## 🧠 Understanding the Prediction")
         
-        if viz_type == "Distribution Analysis":
+        if selected_model == "Random Forest":
+            # Get feature importance from Random Forest
+            feature_importance = models['Random Forest'].feature_importances_
+            
+            # Create feature importance dataframe
+            feature_names_list = feature_names
+            importance_df = pd.DataFrame({
+                'Feature': feature_names_list,
+                'Importance': feature_importance
+            }).sort_values('Importance', ascending=False).head(10)
+            
             col1, col2 = st.columns(2)
             
             with col1:
-                numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
-                if numeric_cols:
-                    feature = st.selectbox("Select Feature", numeric_cols)
-                    fig = px.histogram(
-                        data, x=feature, 
-                        color='HeartDisease' if 'HeartDisease' in data.columns else None,
-                        title=f"Distribution of {feature}",
-                        color_discrete_sequence=['#2d7a2d', '#ff6b6b'],
-                        marginal='box'
-                    )
-                    fig.update_layout(height=500)
-                    st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                if 'HeartDisease' in data.columns and numeric_cols:
-                    fig = px.box(
-                        data, x='HeartDisease', y=feature,
-                        title=f"{feature} by Heart Disease Status",
-                        color='HeartDisease',
-                        color_discrete_sequence=['#2d7a2d', '#ff6b6b']
-                    )
-                    fig.update_layout(height=500)
-                    st.plotly_chart(fig, use_container_width=True)
-        
-        elif viz_type == "Correlation Analysis":
-            numeric_data = data.select_dtypes(include=[np.number])
-            if not numeric_data.empty:
-                corr_matrix = numeric_data.corr()
-                
-                fig = px.imshow(
-                    corr_matrix,
-                    text_auto=True,
-                    aspect='auto',
-                    color_continuous_scale='RdBu_r',
-                    title="Feature Correlation Matrix",
-                    width=800,
-                    height=600
-                )
+                st.markdown("#### Top Influencing Features")
+                fig = px.bar(importance_df, x='Importance', y='Feature', 
+                           orientation='h', title="Feature Importance",
+                           color='Importance', color_continuous_scale='RdYlGn')
+                fig.update_layout(height=400)
                 st.plotly_chart(fig, use_container_width=True)
-                
-                # Feature importance based on correlation with target
-                if 'HeartDisease' in corr_matrix.columns:
-                    st.markdown("#### Top Correlations with Heart Disease")
-                    correlations = corr_matrix['HeartDisease'].drop('HeartDisease').sort_values(ascending=False)
-                    fig = px.bar(
-                        x=correlations.values, 
-                        y=correlations.index,
-                        orientation='h',
-                        title="Correlation with Heart Disease",
-                        color=correlations.values,
-                        color_continuous_scale='RdYlGn',
-                        labels={'x': 'Correlation', 'y': 'Feature'}
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                st.markdown("#### Key Factors")
+                top_features = importance_df.head(5)
+                for _, row in top_features.iterrows():
+                    st.markdown(f"- **{row['Feature']}**: {row['Importance']:.2%} influence")
         
-        else:  # Comparative Analysis
-            if 'HeartDisease' in data.columns:
-                categorical_cols = data.select_dtypes(include=['object']).columns.tolist()
-                if categorical_cols:
-                    cat_col = st.selectbox("Select Categorical Feature", categorical_cols)
-                    cross_tab = pd.crosstab(data[cat_col], data['HeartDisease'], normalize='index') * 100
-                    
-                    fig = px.bar(
-                        cross_tab,
-                        title=f"Heart Disease Rate by {cat_col}",
-                        labels={'value': 'Percentage (%)', 'variable': 'Heart Disease'},
-                        color_discrete_sequence=['#2d7a2d', '#ff6b6b'],
-                        barmode='group'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-    
-    # Tab 3: Model Training
-    with tab_training:
-        st.markdown("### Machine Learning Model Training")
+        # Health Recommendations
+        st.markdown("---")
+        st.markdown("## 💡 Health Recommendations")
         
-        if len(models_to_train) == 0:
-            st.warning("Please select at least one model from the sidebar to train.")
-        else:
-            if st.button("🚀 Start Training", use_container_width=True):
-                # Preprocessing function
-                def preprocess_data(df):
-                    df_processed = df.copy()
-                    
-                    # Encode categorical variables
-                    label_encoders = {}
-                    categorical_cols = ['Sex', 'ChestPainType', 'RestingECG', 'ExerciseAngina', 'ST_Slope']
-                    
-                    for col in categorical_cols:
-                        if col in df_processed.columns:
-                            le = LabelEncoder()
-                            df_processed[col] = le.fit_transform(df_processed[col].astype(str))
-                            label_encoders[col] = le
-                    
-                    # Handle missing values
-                    df_processed = df_processed.fillna(df_processed.median())
-                    
-                    # Separate features and target
-                    X = df_processed.drop('HeartDisease', axis=1)
-                    y = df_processed['HeartDisease']
-                    
-                    return X, y, label_encoders
-                
-                with st.spinner("Processing data and training models..."):
-                    # Preprocess
-                    X, y, encoders = preprocess_data(data)
-                    
-                    # Split data
-                    X_train, X_test, y_train, y_test = train_test_split(
-                        X, y, test_size=test_size, random_state=random_state, stratify=y
-                    )
-                    
-                    # Scale features
-                    scaler = StandardScaler()
-                    X_train_scaled = scaler.fit_transform(X_train)
-                    X_test_scaled = scaler.transform(X_test)
-                    
-                    # Define models
-                    models = {
-                        'Logistic Regression': LogisticRegression(random_state=random_state, max_iter=1000),
-                        'K-Nearest Neighbors': KNeighborsClassifier(n_neighbors=5),
-                        'Decision Tree': DecisionTreeClassifier(random_state=random_state, max_depth=5),
-                        'Random Forest': RandomForestClassifier(random_state=random_state, n_estimators=100, max_depth=10),
-                        'Gradient Boosting': GradientBoostingClassifier(random_state=random_state, n_estimators=100),
-                        'SVM': SVC(random_state=random_state, probability=True, kernel='rbf')
-                    }
-                    
-                    # Train selected models
-                    results = {}
-                    trained_models = {}
-                    
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-                    
-                    for idx, model_name in enumerate(models_to_train):
-                        if model_name in models:
-                            status_text.text(f"Training {model_name}...")
-                            model = models[model_name]
-                            
-                            try:
-                                model.fit(X_train_scaled, y_train)
-                                y_pred = model.predict(X_test_scaled)
-                                
-                                # Calculate metrics
-                                accuracy = accuracy_score(y_test, y_pred)
-                                precision = precision_score(y_test, y_pred)
-                                recall = recall_score(y_test, y_pred)
-                                f1 = f1_score(y_test, y_pred)
-                                
-                                # Cross-validation
-                                cv_scores = cross_val_score(model, X_train_scaled, y_train, cv=cv_folds)
-                                
-                                # ROC-AUC
-                                if hasattr(model, 'predict_proba'):
-                                    y_pred_proba = model.predict_proba(X_test_scaled)[:, 1]
-                                    roc_auc = roc_auc_score(y_test, y_pred_proba)
-                                else:
-                                    roc_auc = None
-                                
-                                results[model_name] = {
-                                    'accuracy': accuracy,
-                                    'precision': precision,
-                                    'recall': recall,
-                                    'f1_score': f1,
-                                    'cv_mean': cv_scores.mean(),
-                                    'cv_std': cv_scores.std(),
-                                    'roc_auc': roc_auc,
-                                    'model': model,
-                                    'predictions': y_pred
-                                }
-                                trained_models[model_name] = model
-                                
-                            except Exception as e:
-                                st.error(f"Error training {model_name}: {str(e)}")
-                        
-                        progress_bar.progress((idx + 1) / len(models_to_train))
-                    
-                    status_text.text("Training complete!")
-                    progress_bar.empty()
-                    
-                    if results:
-                        # Store in session state
-                        st.session_state.results = results
-                        st.session_state.trained_models = trained_models
-                        st.session_state.scaler = scaler
-                        st.session_state.encoders = encoders
-                        st.session_state.X_columns = X.columns.tolist()
-                        st.session_state.models_trained = True
-                        
-                        # Display results
-                        st.markdown("### 📊 Model Performance Comparison")
-                        
-                        # Create results dataframe
-                        results_df = pd.DataFrame({
-                            'Model': list(results.keys()),
-                            'Accuracy': [results[m]['accuracy'] for m in results],
-                            'Precision': [results[m]['precision'] for m in results],
-                            'Recall': [results[m]['recall'] for m in results],
-                            'F1-Score': [results[m]['f1_score'] for m in results],
-                            'CV Score': [results[m]['cv_mean'] for m in results],
-                            'ROC-AUC': [results[m]['roc_auc'] if results[m]['roc_auc'] else 0 for m in results]
-                        })
-                        
-                        # Sort by accuracy
-                        results_df = results_df.sort_values('Accuracy', ascending=False)
-                        
-                        # Display metrics table with styling
-                        st.dataframe(
-                            results_df.style.format({
-                                'Accuracy': '{:.3f}',
-                                'Precision': '{:.3f}',
-                                'Recall': '{:.3f}',
-                                'F1-Score': '{:.3f}',
-                                'CV Score': '{:.3f}',
-                                'ROC-AUC': '{:.3f}'
-                            }).background_gradient(subset=['Accuracy', 'F1-Score'], cmap='RdYlGn'),
-                            use_container_width=True
-                        )
-                        
-                        # Performance visualization
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            fig = px.bar(
-                                results_df, x='Model', y='Accuracy',
-                                title='Model Accuracy Comparison',
-                                color='Accuracy',
-                                color_continuous_scale='RdYlGn',
-                                text='Accuracy'
-                            )
-                            fig.update_traces(texttemplate='%{text:.3f}', textposition='outside')
-                            fig.update_layout(xaxis_tickangle=-45, height=500)
-                            st.plotly_chart(fig, use_container_width=True)
-                        
-                        with col2:
-                            fig = px.bar(
-                                results_df, x='Model', y='F1-Score',
-                                title='Model F1-Score Comparison',
-                                color='F1-Score',
-                                color_continuous_scale='RdYlGn',
-                                text='F1-Score'
-                            )
-                            fig.update_traces(texttemplate='%{text:.3f}', textposition='outside')
-                            fig.update_layout(xaxis_tickangle=-45, height=500)
-                            st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Best model highlight
-                        best_model = results_df.iloc[0]['Model']
-                        best_accuracy = results_df.iloc[0]['Accuracy']
-                        
-                        st.markdown(f"""
-                        <div class="success-message">
-                            <strong>🏆 Best Performing Model: {best_model}</strong><br>
-                            Accuracy: {best_accuracy:.3f} ({best_accuracy*100:.1f}%)<br>
-                            This model is recommended for predictions.
-                        </div>
-                        """, unsafe_allow_html=True)
-                        
-                        # Confusion Matrix for best model
-                        st.markdown("### Confusion Matrix - Best Model")
-                        best_model_obj = results[best_model]['model']
-                        best_predictions = results[best_model]['predictions']
-                        
-                        cm = confusion_matrix(y_test, best_predictions)
-                        fig = px.imshow(
-                            cm,
-                            text_auto=True,
-                            labels=dict(x="Predicted", y="Actual", color="Count"),
-                            x=['No Disease', 'Disease'],
-                            y=['No Disease', 'Disease'],
-                            title=f"Confusion Matrix - {best_model}",
-                            color_continuous_scale='Blues'
-                        )
-                        fig.update_layout(height=400)
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Classification report
-                        st.markdown("### Detailed Classification Report")
-                        report = classification_report(y_test, best_predictions, output_dict=True)
-                        report_df = pd.DataFrame(report).transpose()
-                        st.dataframe(report_df.style.format('{:.3f}'), use_container_width=True)
-                        
-                        # Feature Importance for tree-based models
-                        if best_model in ['Random Forest', 'Gradient Boosting', 'Decision Tree']:
-                            st.markdown("### Feature Importance Analysis")
-                            
-                            if hasattr(best_model_obj, 'feature_importances_'):
-                                importances = best_model_obj.feature_importances_
-                                feature_names = X.columns
-                                
-                                importance_df = pd.DataFrame({
-                                    'Feature': feature_names,
-                                    'Importance': importances
-                                }).sort_values('Importance', ascending=True)
-                                
-                                fig = px.bar(
-                                    importance_df,
-                                    x='Importance',
-                                    y='Feature',
-                                    orientation='h',
-                                    title=f"Top Features - {best_model}",
-                                    color='Importance',
-                                    color_continuous_scale='RdYlGn'
-                                )
-                                fig.update_layout(height=500)
-                                st.plotly_chart(fig, use_container_width=True)
-    
-    # Tab 4: Predictions
-    with tab_prediction:
-        st.markdown("### 🔮 Patient Risk Assessment")
-        
-        if not st.session_state.get('models_trained', False):
+        if prediction == 1:
             st.markdown("""
-            <div class="info-box">
-                ⚠️ No trained models found. Please go to the "Model Training" tab and train models first.
-            </div>
-            """, unsafe_allow_html=True)
+            ### ⚠️ High Risk - Recommended Actions:
+            
+            **Immediate Steps:**
+            - 🏥 Schedule an appointment with a cardiologist immediately
+            - 📊 Get a complete cardiac evaluation (ECG, Echo, Stress Test)
+            - 💊 Discuss preventive medications with your doctor
+            
+            **Lifestyle Changes:**
+            - 🍎 Adopt a heart-healthy Mediterranean diet
+            - 🏃 Start a supervised exercise program (30 mins/day, 5 days/week)
+            - 🚭 Quit smoking and limit alcohol consumption
+            - 📉 Monitor blood pressure and cholesterol regularly
+            - 🧘 Practice stress management techniques (meditation, yoga)
+            
+            **Medications (if prescribed):**
+            - Blood pressure medications
+            - Cholesterol-lowering statins
+            - Antiplatelet therapy (aspirin)
+            """)
         else:
-            st.markdown("#### Enter Patient Clinical Data")
+            st.markdown("""
+            ### ✅ Low Risk - Preventive Recommendations:
             
-            col1, col2, col3 = st.columns(3)
+            **Maintain Healthy Habits:**
+            - 🍏 Continue balanced diet rich in fruits, vegetables, and whole grains
+            - 🏃 Regular physical activity (150 minutes moderate exercise/week)
+            - 💤 Get 7-8 hours of quality sleep
+            - 🧠 Manage stress through hobbies and relaxation
             
-            with col1:
-                age = st.number_input("Age (years)", min_value=20, max_value=100, value=50)
-                sex = st.selectbox("Gender", ['M', 'F'])
-                cp = st.selectbox("Chest Pain Type", ['ATA', 'NAP', 'ASY', 'TA'])
+            **Preventive Care:**
+            - 📅 Annual health check-ups
+            - ❤️ Monitor blood pressure (target <120/80)
+            - 📊 Check cholesterol levels every 4-6 years
+            - 🩸 Screen for diabetes if at risk
             
-            with col2:
-                resting_bp = st.number_input("Resting Blood Pressure (mm Hg)", min_value=80, max_value=200, value=120)
-                cholesterol = st.number_input("Cholesterol (mg/dl)", min_value=100, max_value=600, value=200)
-                fasting_bs = st.selectbox("Fasting Blood Sugar > 120 mg/dl", [0, 1], format_func=lambda x: "Yes" if x==1 else "No")
-            
-            with col3:
-                resting_ecg = st.selectbox("Resting ECG Results", ['Normal', 'ST', 'LVH'])
-                max_hr = st.number_input("Maximum Heart Rate", min_value=60, max_value=220, value=150)
-                exercise_angina = st.selectbox("Exercise Induced Angina", ['N', 'Y'], format_func=lambda x: "Yes" if x=='Y' else "No")
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                oldpeak = st.number_input("ST Depression (Oldpeak)", min_value=-3.0, max_value=6.0, value=0.0, step=0.1)
-            
-            with col2:
-                st_slope = st.selectbox("ST Slope", ['Up', 'Flat', 'Down'])
-            
-            with col3:
-                # Model selection for prediction
-                available_models = list(st.session_state.trained_models.keys())
-                if available_models:
-                    prediction_model = st.selectbox("Select Model for Prediction", available_models)
-            
-            if st.button("🩺 Assess Heart Disease Risk", use_container_width=True):
-                # Create input dataframe
-                input_data = pd.DataFrame({
-                    'Age': [age],
-                    'Sex': [sex],
-                    'ChestPainType': [cp],
-                    'RestingBP': [resting_bp],
-                    'Cholesterol': [cholesterol],
-                    'FastingBS': [fasting_bs],
-                    'RestingECG': [resting_ecg],
-                    'MaxHR': [max_hr],
-                    'ExerciseAngina': [exercise_angina],
-                    'Oldpeak': [oldpeak],
-                    'ST_Slope': [st_slope]
-                })
-                
-                # Encode categorical variables
-                for col in ['Sex', 'ChestPainType', 'RestingECG', 'ExerciseAngina', 'ST_Slope']:
-                    if col in st.session_state.encoders:
-                        encoder = st.session_state.encoders[col]
-                        try:
-                            input_data[col] = encoder.transform(input_data[col])
-                        except:
-                            input_data[col] = 0
-                
-                # Ensure all features are present
-                for col in st.session_state.X_columns:
-                    if col not in input_data.columns:
-                        input_data[col] = 0
-                
-                input_data = input_data[st.session_state.X_columns]
-                
-                # Scale features
-                input_scaled = st.session_state.scaler.transform(input_data)
-                
-                # Make prediction
-                model = st.session_state.trained_models[prediction_model]
-                prediction = model.predict(input_scaled)[0]
-                
-                if hasattr(model, 'predict_proba'):
-                    probability = model.predict_proba(input_scaled)[0][1]
-                else:
-                    probability = None
-                
-                # Display results
-                st.markdown("---")
-                st.markdown("### 📋 Assessment Results")
-                
+            **Healthy Lifestyle Tips:**
+            - Maintain healthy weight (BMI 18.5-24.9)
+            - Limit processed foods and added sugars
+            - Stay hydrated (8-10 glasses water daily)
+            - Build strong social connections
+            """)
+
+# ==================== VISUALIZATIONS PAGE ====================
+elif page == "📊 Visualizations":
+    st.markdown("""
+    <div class="main-header">
+        <h1>📊 Data Visualizations</h1>
+        <p>Explore patterns and insights in heart disease data</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if 'target' in st.session_state.data.columns:
+        df_viz = st.session_state.data
+        
+        # Target Distribution
+        st.markdown("### 🎯 Target Variable Distribution")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            target_counts = df_viz['target'].value_counts()
+            fig = px.pie(values=target_counts.values, names=['No Disease', 'Disease'],
+                        title="Heart Disease Distribution",
+                        color_discrete_sequence=['#2ecc71', '#e74c3c'],
+                        hole=0.3)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            fig = px.bar(x=['No Disease', 'Disease'], y=target_counts.values,
+                        title="Count of Cases",
+                        color=['No Disease', 'Disease'],
+                        color_discrete_sequence=['#2ecc71', '#e74c3c'],
+                        text=target_counts.values)
+            fig.update_layout(xaxis_title="Heart Disease", yaxis_title="Count")
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Age Distribution
+        st.markdown("### 📅 Age Distribution by Heart Disease")
+        fig = px.histogram(df_viz, x='age', color='target', nbins=30,
+                          title="Age Distribution by Heart Disease Status",
+                          color_discrete_sequence=['#2ecc71', '#e74c3c'],
+                          labels={'target': 'Heart Disease', 'age': 'Age'})
+        fig.update_layout(barmode='overlay')
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Cholesterol Distribution
+        st.markdown("### 🩸 Cholesterol Levels by Heart Disease")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            fig = px.box(df_viz, x='target', y='chol', color='target',
+                        title="Cholesterol Distribution",
+                        color_discrete_sequence=['#2ecc71', '#e74c3c'],
+                        labels={'target': 'Heart Disease', 'chol': 'Cholesterol'})
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            fig = px.violin(df_viz, x='target', y='chol', color='target',
+                           title="Cholesterol Violin Plot",
+                           color_discrete_sequence=['#2ecc71', '#e74c3c'],
+                           box=True)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Correlation Heatmap
+        st.markdown("### 🔥 Correlation Heatmap")
+        
+        # Select only numeric columns
+        numeric_cols = df_viz.select_dtypes(include=[np.number]).columns
+        correlation_matrix = df_viz[numeric_cols].corr()
+        
+        fig = px.imshow(correlation_matrix, text_auto=True, aspect="auto",
+                        color_continuous_scale='RdBu_r',
+                        title="Feature Correlation Matrix")
+        fig.update_layout(height=600)
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Additional Visualizations
+        st.markdown("### 📈 Additional Insights")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Max Heart Rate Distribution
+            fig = px.histogram(df_viz, x='thalach', color='target', 
+                              title="Maximum Heart Rate Distribution",
+                              color_discrete_sequence=['#2ecc71', '#e74c3c'],
+                              nbins=30)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            # Chest Pain Type Analysis
+            cp_counts = pd.crosstab(df_viz['cp'], df_viz['target'], normalize='index') * 100
+            fig = px.bar(cp_counts, title="Heart Disease Rate by Chest Pain Type",
+                        labels={'value': 'Percentage (%)', 'cp': 'Chest Pain Type'},
+                        color_discrete_sequence=['#2ecc71', '#e74c3c'],
+                        barmode='group')
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Scatter plot
+        st.markdown("### 📊 Age vs Max Heart Rate")
+        fig = px.scatter(df_viz, x='age', y='thalach', color='target',
+                        title="Age vs Maximum Heart Rate",
+                        color_discrete_sequence=['#2ecc71', '#e74c3c'],
+                        size='chol', hover_data=['chol', 'trestbps'])
+        st.plotly_chart(fig, use_container_width=True)
+        
+    else:
+        st.warning("Target column not found in dataset. Cannot generate visualizations.")
+
+# ==================== MODEL COMPARISON PAGE ====================
+elif page == "🧪 Model Comparison":
+    st.markdown("""
+    <div class="main-header">
+        <h1>🧪 Model Performance Comparison</h1>
+        <p>Evaluate and compare different machine learning models</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if y is not None:
+        st.markdown("### 📊 Model Performance Metrics")
+        
+        # Create comparison dataframe
+        comparison_df = pd.DataFrame({
+            'Model': list(results.keys()),
+            'Accuracy': [results[model]['accuracy'] for model in results]
+        })
+        
+        # Sort by accuracy
+        comparison_df = comparison_df.sort_values('Accuracy', ascending=False)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.dataframe(
+                comparison_df.style.format({'Accuracy': '{:.3f}'})
+                .background_gradient(subset=['Accuracy'], cmap='RdYlGn'),
+                use_container_width=True
+            )
+        
+        with col2:
+            fig = px.bar(comparison_df, x='Model', y='Accuracy',
+                        title="Model Accuracy Comparison",
+                        color='Accuracy', color_continuous_scale='RdYlGn',
+                        text='Accuracy')
+            fig.update_traces(texttemplate='%{text:.3f}', textposition='outside')
+            fig.update_layout(xaxis_tickangle=-45)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Confusion Matrices for each model
+        st.markdown("### 📈 Confusion Matrices")
+        
+        tabs = st.tabs(list(results.keys()))
+        
+        for idx, (model_name, model_data) in enumerate(results.items()):
+            with tabs[idx]:
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    if prediction == 1:
-                        st.markdown("""
-                        <div class="warning-message">
-                            <strong>⚠️ HIGH RISK DETECTED</strong><br>
-                            The AI model predicts an elevated risk of heart disease.<br><br>
-                            <strong>Recommended Actions:</strong><br>
-                            • 🏥 Schedule immediate consultation with a cardiologist<br>
-                            • 📊 Complete cardiac workup (ECG, Echo, Stress test)<br>
-                            • 💊 Consider preventive medications if indicated<br>
-                            • 🍎 Start heart-healthy diet immediately<br>
-                            • 🏃 Begin supervised exercise program
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown("""
-                        <div class="success-message">
-                            <strong>✅ LOW RISK DETECTED</strong><br>
-                            The AI model predicts low risk of heart disease.<br><br>
-                            <strong>Preventive Recommendations:</strong><br>
-                            • 🍏 Maintain healthy diet and lifestyle<br>
-                            • 🏃 Regular physical activity (150 minutes/week)<br>
-                            • 📅 Annual health check-ups<br>
-                            • ❤️ Monitor blood pressure and cholesterol<br>
-                            • 🚭 Avoid smoking and limit alcohol
-                        </div>
-                        """, unsafe_allow_html=True)
+                    cm = confusion_matrix(model_data['y_test'], model_data['predictions'])
+                    fig = px.imshow(cm, text_auto=True,
+                                   labels=dict(x="Predicted", y="Actual"),
+                                   x=['No Disease', 'Disease'],
+                                   y=['No Disease', 'Disease'],
+                                   title=f"{model_name} - Confusion Matrix",
+                                   color_continuous_scale='Blues')
+                    fig.update_layout(height=400)
+                    st.plotly_chart(fig, use_container_width=True)
                 
                 with col2:
-                    if probability is not None:
-                        risk_level = probability * 100
-                        
-                        # Risk meter
-                        fig = go.Figure(go.Indicator(
-                            mode="gauge+number",
-                            value=risk_level,
-                            title={'text': "Risk Score", 'font': {'size': 24}},
-                            domain={'x': [0, 1], 'y': [0, 1]},
-                            gauge={
-                                'axis': {'range': [0, 100], 'tickwidth': 1},
-                                'bar': {'color': "#dc3545" if risk_level > 50 else "#28a745"},
-                                'bgcolor': "white",
-                                'borderwidth': 2,
-                                'bordercolor': "gray",
-                                'steps': [
-                                    {'range': [0, 30], 'color': '#d4edda'},
-                                    {'range': [30, 70], 'color': '#fff3cd'},
-                                    {'range': [70, 100], 'color': '#f8d7da'}
-                                ],
-                                'threshold': {
-                                    'line': {'color': "red", 'width': 4},
-                                    'thickness': 0.75,
-                                    'value': risk_level
-                                }
-                            }
-                        ))
-                        fig.update_layout(height=350, margin=dict(t=50, b=0, l=0, r=0))
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        st.markdown(f"""
-                        <div style="text-align: center; margin-top: 10px;">
-                            <span style="font-size: 1.2rem; font-weight: bold;">
-                                Probability of Heart Disease: {risk_level:.1f}%
-                            </span>
-                        </div>
-                        """, unsafe_allow_html=True)
-                
-                # Detailed risk factors
-                st.markdown("### 📊 Key Risk Factors Analysis")
-                
-                risk_factors = []
-                if age > 55:
-                    risk_factors.append(("Age > 55", "Increased risk with age", "high"))
-                if resting_bp > 140:
-                    risk_factors.append(("High Blood Pressure", f"{resting_bp} mm Hg > 140", "high"))
-                elif resting_bp > 120:
-                    risk_factors.append(("Elevated BP", f"{resting_bp} mm Hg", "moderate"))
-                if cholesterol > 240:
-                    risk_factors.append(("High Cholesterol", f"{cholesterol} mg/dl > 240", "high"))
-                elif cholesterol > 200:
-                    risk_factors.append(("Borderline Cholesterol", f"{cholesterol} mg/dl", "moderate"))
-                if max_hr < 100:
-                    risk_factors.append(("Low Max HR", f"{max_hr} bpm < 100", "high"))
-                if oldpeak > 1.5:
-                    risk_factors.append(("Significant ST Depression", f"Oldpeak: {oldpeak}", "high"))
-                
-                if risk_factors:
-                    for risk_factor, details, severity in risk_factors:
-                        color = "#dc3545" if severity == "high" else "#ffc107"
-                        st.markdown(f"""
-                        <div style="border-left: 3px solid {color}; padding: 10px; margin: 5px 0; background: #f8f9fa;">
-                            <strong>{risk_factor}</strong><br>
-                            {details}
-                        </div>
-                        """, unsafe_allow_html=True)
-                else:
-                    st.markdown("✅ No major risk factors identified based on the entered data.")
-                
-                # Disclaimer
-                st.markdown("---")
-                st.markdown("""
-                <div style="background: #e7f3ff; padding: 1rem; border-radius: 8px; font-size: 0.9rem;">
-                    <strong>⚠️ Medical Disclaimer:</strong> This is an AI-powered screening tool for educational purposes only. 
-                    It does not replace professional medical advice, diagnosis, or treatment. Always consult with a qualified 
-                    healthcare provider for medical decisions.
-                </div>
-                """, unsafe_allow_html=True)
+                    # Classification report
+                    report = classification_report(model_data['y_test'], model_data['predictions'], 
+                                                  target_names=['No Disease', 'Disease'], output_dict=True)
+                    report_df = pd.DataFrame(report).transpose()
+                    st.dataframe(report_df.style.format('{:.3f}'), use_container_width=True)
+        
+        # Cross-validation comparison
+        st.markdown("### 🔄 Cross-Validation Results")
+        st.info("Note: To get cross-validation scores, you can use cross_val_score from sklearn.")
+        
+        # Feature Importance for Random Forest
+        st.markdown("### 🌟 Random Forest Feature Importance")
+        
+        rf_model = models['Random Forest']
+        feature_importance = rf_model.feature_importances_
+        
+        importance_df = pd.DataFrame({
+            'Feature': feature_names,
+            'Importance': feature_importance
+        }).sort_values('Importance', ascending=True)
+        
+        fig = px.bar(importance_df, x='Importance', y='Feature', orientation='h',
+                    title="Random Forest Feature Importance",
+                    color='Importance', color_continuous_scale='RdYlGn')
+        fig.update_layout(height=500)
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Model Recommendations
+        st.markdown("### 💡 Model Selection Recommendation")
+        
+        best_model = comparison_df.iloc[0]['Model']
+        best_accuracy = comparison_df.iloc[0]['Accuracy']
+        
+        if best_model == "Random Forest":
+            st.success(f"🏆 **Recommended Model: Random Forest**\n\n"
+                      f"Accuracy: {best_accuracy:.3f} ({best_accuracy*100:.1f}%)\n\n"
+                      f"Random Forest performs best on this dataset due to its ability to handle "
+                      f"complex interactions between features and its robustness to overfitting. "
+                      f"It also provides feature importance insights.")
+        elif best_model == "Logistic Regression":
+            st.info(f"🏆 **Recommended Model: Logistic Regression**\n\n"
+                   f"Accuracy: {best_accuracy:.3f} ({best_accuracy*100:.1f}%)\n\n"
+                   f"Logistic Regression offers good performance with high interpretability. "
+                   f"It's a good choice when you need to explain predictions to clinicians.")
+        else:
+            st.info(f"🏆 **Recommended Model: SVM**\n\n"
+                   f"Accuracy: {best_accuracy:.3f} ({best_accuracy*100:.1f}%)\n\n"
+                   f"SVM performs well on this dataset, especially with the RBF kernel. "
+                   f"It's effective in high-dimensional spaces.")
+
+# ==================== ABOUT PAGE ====================
+else:
+    st.markdown("""
+    <div class="main-header">
+        <h1>ℹ️ About This Project</h1>
+        <p>Heart Disease Prediction System - Data Science Final Year Project</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### 🎯 Project Objective")
+        st.markdown("""
+        This project aims to develop a machine learning-based system for predicting heart disease 
+        risk using clinical parameters. Early detection can significantly improve patient outcomes 
+        and reduce healthcare costs.
+        """)
+        
+        st.markdown("### 🛠️ Technologies Used")
+        st.markdown("""
+        - **Frontend:** Streamlit
+        - **Machine Learning:** scikit-learn
+        - **Data Processing:** Pandas, NumPy
+        - **Visualization:** Matplotlib, Seaborn, Plotly
+        - **Deployment:** Streamlit Cloud
+        """)
+        
+        st.markdown("### 📊 Dataset Information")
+        st.markdown("""
+        The dataset contains 13 clinical features:
+        - **Age:** Age in years
+        - **Sex:** Male/Female
+        - **CP:** Chest pain type
+        - **Trestbps:** Resting blood pressure
+        - **Chol:** Serum cholesterol
+        - **Fbs:** Fasting blood sugar
+        - **Restecg:** Resting ECG results
+        - **Thalach:** Maximum heart rate
+        - **Exang:** Exercise induced angina
+        - **Oldpeak:** ST depression
+        - **Slope:** Slope of peak exercise ST segment
+        - **CA:** Number of major vessels
+        - **Thal:** Thalassemia
+        """)
+    
+    with col2:
+        st.markdown("### 🤖 Machine Learning Models")
+        st.markdown("""
+        Three models are implemented for comparison:
+        
+        **1. Logistic Regression**
+        - Simple and interpretable
+        - Good baseline model
+        - Provides probability estimates
+        
+        **2. Random Forest**
+        - Ensemble learning method
+        - Handles non-linear relationships
+        - Provides feature importance
+        
+        **3. Support Vector Machine (SVM)**
+        - Effective in high dimensions
+        - Uses RBF kernel
+        - Good for complex decision boundaries
+        """)
+        
+        st.markdown("### 📈 Model Performance")
+        st.markdown("""
+        Models are evaluated using:
+        - Accuracy
+        - Confusion Matrix
+        - Classification Report
+        - Cross-Validation
+        """)
+        
+        st.markdown("### 👨‍💻 Developer")
+        st.markdown("""
+        **Data Science Final Year Project**
+        
+        This system is designed as a comprehensive solution for heart disease prediction,
+        demonstrating the application of machine learning in healthcare.
+        """)
+    
+    st.markdown("---")
+    st.markdown("### 📚 References")
+    st.markdown("""
+    - UCI Machine Learning Repository - Heart Disease Dataset
+    - American Heart Association Guidelines
+    - scikit-learn Documentation
+    - Streamlit Documentation
+    """)
+    
+    st.info("💡 **Note:** This system is for educational purposes only. Always consult healthcare professionals for medical advice.")
 
 # Footer
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #666; padding: 1rem;">
-    <p>❤️ Heart Disease Prediction System | Powered by Machine Learning</p>
-    <p style="font-size: 0.8rem;">© 2024 - Clinical Decision Support Tool</p>
+    <p>❤️ Heart Disease Prediction System | Data Science Final Year Project</p>
+    <p style="font-size: 0.8rem;">Powered by Machine Learning | For Educational Purposes Only</p>
 </div>
 """, unsafe_allow_html=True)
