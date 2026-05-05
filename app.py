@@ -55,6 +55,12 @@ st.markdown("""
         color: #333;
         text-align: center;
     }
+    .info-box {
+        background: #e7f3ff;
+        padding: 1rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -71,8 +77,8 @@ if 'scaler' not in st.session_state:
     st.session_state.scaler = None
 if 'feature_names' not in st.session_state:
     st.session_state.feature_names = None
-if 'label_encoders' not in st.session_state:
-    st.session_state.label_encoders = None
+if 'target_column' not in st.session_state:
+    st.session_state.target_column = 'target'
 
 # Sidebar Navigation
 st.sidebar.title("🔍 Navigation")
@@ -88,10 +94,10 @@ st.sidebar.info(
     "Using Machine Learning to predict heart disease risk based on clinical parameters."
 )
 
-# Load default dataset function
+# Load default dataset function with proper target column
 @st.cache_data
 def load_default_data():
-    # Create sample data with numeric values only
+    # Create comprehensive sample data with numeric values
     data = pd.DataFrame({
         'age': [52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71],
         'sex': [1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1],
@@ -110,6 +116,15 @@ def load_default_data():
     })
     return data
 
+# Function to detect target column
+def detect_target_column(df):
+    possible_targets = ['target', 'HeartDisease', 'heart_disease', 'condition', 'num', 'Target', 'Heart_Disease']
+    for col in possible_targets:
+        if col in df.columns:
+            return col
+    # If no target column found, assume the last column is target
+    return df.columns[-1]
+
 # File upload section
 st.sidebar.markdown("---")
 st.sidebar.subheader("📂 Data Upload")
@@ -118,71 +133,36 @@ uploaded_file = st.sidebar.file_uploader("Upload your CSV file", type=['csv'])
 if uploaded_file is not None:
     try:
         data = pd.read_csv(uploaded_file)
+        # Detect target column
+        target_col = detect_target_column(data)
+        st.session_state.target_column = target_col
         st.session_state.data = data
         st.session_state.data_loaded = True
         st.sidebar.success(f"✅ Loaded {len(data)} records!")
+        st.sidebar.info(f"🎯 Target column: '{target_col}'")
     except Exception as e:
         st.sidebar.error(f"Error loading file: {e}")
         data = load_default_data()
+        st.session_state.target_column = 'target'
         st.session_state.data = data
         st.session_state.data_loaded = True
-        st.sidebar.info("Using default dataset")
+        st.sidebar.info("📊 Using default dataset")
 else:
     data = load_default_data()
+    st.session_state.target_column = 'target'
     st.session_state.data = data
     st.session_state.data_loaded = True
     st.sidebar.info("📊 Using default dataset")
 
-# Data preprocessing function - FIXED: Properly handle categorical variables
-def preprocess_data(df):
+# Data preprocessing function
+def preprocess_data(df, target_col):
     df_processed = df.copy()
     
-    # Define mappings for categorical columns
-    # Sex mapping
-    if 'sex' in df_processed.columns:
-        if df_processed['sex'].dtype == 'object':
-            df_processed['sex'] = df_processed['sex'].map({'M': 1, 'F': 0, 'Male': 1, 'Female': 0})
-    
-    # Chest Pain Type mapping
-    if 'cp' in df_processed.columns:
-        cp_mapping = {'ATA': 0, 'NAP': 1, 'ASY': 2, 'TA': 3, 
-                      'Typical Angina': 0, 'Atypical Angina': 1, 
-                      'Non-anginal Pain': 2, 'Asymptomatic': 3}
-        if df_processed['cp'].dtype == 'object':
-            df_processed['cp'] = df_processed['cp'].map(cp_mapping).fillna(0)
-    
-    # Fasting Blood Sugar mapping
-    if 'fbs' in df_processed.columns and df_processed['fbs'].dtype == 'object':
-        df_processed['fbs'] = df_processed['fbs'].map({'Yes': 1, 'No': 0}).fillna(0)
-    
-    # Resting ECG mapping
-    if 'restecg' in df_processed.columns:
-        restecg_mapping = {'Normal': 0, 'ST': 1, 'LVH': 2}
-        if df_processed['restecg'].dtype == 'object':
-            df_processed['restecg'] = df_processed['restecg'].map(restecg_mapping).fillna(0)
-    
-    # Exercise Angina mapping
-    if 'exang' in df_processed.columns:
-        if df_processed['exang'].dtype == 'object':
-            df_processed['exang'] = df_processed['exang'].map({'N': 0, 'Y': 1, 'No': 0, 'Yes': 1}).fillna(0)
-    
-    # Slope mapping
-    if 'slope' in df_processed.columns:
-        slope_mapping = {'Up': 0, 'Flat': 1, 'Down': 2, 'Upsloping': 0, 'Flat': 1, 'Downsloping': 2}
-        if df_processed['slope'].dtype == 'object':
-            df_processed['slope'] = df_processed['slope'].map(slope_mapping).fillna(0)
-    
-    # Thal mapping
-    if 'thal' in df_processed.columns:
-        thal_mapping = {'Normal': 1, 'Fixed Defect': 2, 'Reversible Defect': 3}
-        if df_processed['thal'].dtype == 'object':
-            df_processed['thal'] = df_processed['thal'].map(thal_mapping).fillna(1)
-    
-    # Handle any remaining non-numeric columns
+    # Convert all columns to numeric where possible
     for col in df_processed.columns:
-        if df_processed[col].dtype == 'object' and col != 'target':
-            # Convert to numeric, coerce errors to NaN
-            df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce').fillna(0)
+        if df_processed[col].dtype == 'object':
+            # Try to convert to numeric
+            df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce')
     
     # Handle missing values
     for col in df_processed.columns:
@@ -190,9 +170,9 @@ def preprocess_data(df):
             df_processed[col] = df_processed[col].fillna(df_processed[col].median())
     
     # Separate features and target
-    if 'target' in df_processed.columns:
-        X = df_processed.drop('target', axis=1)
-        y = df_processed['target']
+    if target_col in df_processed.columns:
+        X = df_processed.drop(target_col, axis=1)
+        y = df_processed[target_col]
     else:
         X = df_processed
         y = None
@@ -241,7 +221,8 @@ def train_models(X, y):
 # Train models if data is available
 if st.session_state.data_loaded and st.session_state.data is not None:
     try:
-        X_scaled, y, scaler, feature_names = preprocess_data(st.session_state.data)
+        target_col = st.session_state.target_column
+        X_scaled, y, scaler, feature_names = preprocess_data(st.session_state.data, target_col)
         if y is not None:
             if st.session_state.models is None:
                 models, results = train_models(X_scaled, y)
@@ -295,10 +276,11 @@ if page == "🏠 Home":
     with col2:
         st.markdown("### 📊 Dataset Information")
         if st.session_state.data is not None:
+            target_name = st.session_state.target_column
             st.markdown(f"""
             **Total Records:** {len(st.session_state.data)}  
-            **Features:** 13 clinical parameters  
-            **Target Variable:** Heart Disease (0 = No, 1 = Yes)
+            **Features:** {len(st.session_state.data.columns) - 1} clinical parameters  
+            **Target Variable:** {target_name} (0 = No Disease, 1 = Disease)
             
             **Clinical Features:**
             - Age, Sex, Chest Pain Type
@@ -308,13 +290,13 @@ if page == "🏠 Home":
             - ST Depression, Slope, CA, Thal
             """)
             
-            if 'target' in st.session_state.data.columns:
-                disease_count = st.session_state.data['target'].sum()
+            if target_name in st.session_state.data.columns:
+                disease_count = st.session_state.data[target_name].sum()
                 healthy_count = len(st.session_state.data) - disease_count
                 st.markdown(f"""
                 **Target Distribution:**
-                - ❤️ Disease: {disease_count} ({disease_count/len(st.session_state.data)*100:.1f}%)
-                - 💚 Healthy: {healthy_count} ({healthy_count/len(st.session_state.data)*100:.1f}%)
+                - ❤️ Disease Cases: {disease_count} ({disease_count/len(st.session_state.data)*100:.1f}%)
+                - 💚 Healthy Cases: {healthy_count} ({healthy_count/len(st.session_state.data)*100:.1f}%)
                 """)
     
     st.markdown("---")
@@ -510,63 +492,106 @@ elif page == "📊 Visualizations":
     </div>
     """, unsafe_allow_html=True)
     
-    if st.session_state.data is not None and 'target' in st.session_state.data.columns:
+    if st.session_state.data is not None:
         df_viz = st.session_state.data
+        target_col = st.session_state.target_column
         
-        # Target Distribution
-        st.markdown("### 🎯 Target Variable Distribution")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            target_counts = df_viz['target'].value_counts()
-            fig = px.pie(values=target_counts.values, names=['No Disease', 'Disease'],
-                        title="Heart Disease Distribution",
-                        color_discrete_sequence=['#2ecc71', '#e74c3c'],
-                        hole=0.3)
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            fig = px.bar(x=['No Disease', 'Disease'], y=target_counts.values,
-                        title="Count of Cases",
-                        color=['No Disease', 'Disease'],
-                        color_discrete_sequence=['#2ecc71', '#e74c3c'],
-                        text=target_counts.values)
-            fig.update_layout(xaxis_title="Heart Disease", yaxis_title="Count")
-            st.plotly_chart(fig, use_container_width=True)
-        
-        # Age Distribution
-        if 'age' in df_viz.columns:
-            st.markdown("### 📅 Age Distribution by Heart Disease")
-            fig = px.histogram(df_viz, x='age', color='target', nbins=30,
-                              title="Age Distribution by Heart Disease Status",
-                              color_discrete_sequence=['#2ecc71', '#e74c3c'],
-                              labels={'target': 'Heart Disease', 'age': 'Age'})
-            fig.update_layout(barmode='overlay')
-            st.plotly_chart(fig, use_container_width=True)
-        
-        # Cholesterol Distribution
-        if 'chol' in df_viz.columns:
-            st.markdown("### 🩸 Cholesterol Levels by Heart Disease")
+        # Check if target column exists
+        if target_col in df_viz.columns:
+            # Target Distribution
+            st.markdown("### 🎯 Target Variable Distribution")
             col1, col2 = st.columns(2)
             
             with col1:
-                fig = px.box(df_viz, x='target', y='chol', color='target',
-                            title="Cholesterol Distribution",
-                            color_discrete_sequence=['#2ecc71', '#e74c3c'])
+                target_counts = df_viz[target_col].value_counts()
+                fig = px.pie(values=target_counts.values, names=['No Disease', 'Disease'],
+                            title="Heart Disease Distribution",
+                            color_discrete_sequence=['#2ecc71', '#e74c3c'],
+                            hole=0.3)
                 st.plotly_chart(fig, use_container_width=True)
-        
-        # Correlation Heatmap
-        st.markdown("### 🔥 Correlation Heatmap")
-        numeric_cols = df_viz.select_dtypes(include=[np.number]).columns
-        if len(numeric_cols) > 1:
-            correlation_matrix = df_viz[numeric_cols].corr()
-            fig = px.imshow(correlation_matrix, text_auto=True, aspect="auto",
-                            color_continuous_scale='RdBu_r',
-                            title="Feature Correlation Matrix")
-            fig.update_layout(height=600)
-            st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                fig = px.bar(x=['No Disease', 'Disease'], y=target_counts.values,
+                            title="Count of Cases",
+                            color=['No Disease', 'Disease'],
+                            color_discrete_sequence=['#2ecc71', '#e74c3c'],
+                            text=target_counts.values)
+                fig.update_layout(xaxis_title="Heart Disease", yaxis_title="Count")
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Age Distribution
+            if 'age' in df_viz.columns:
+                st.markdown("### 📅 Age Distribution by Heart Disease")
+                fig = px.histogram(df_viz, x='age', color=target_col, nbins=30,
+                                  title="Age Distribution by Heart Disease Status",
+                                  color_discrete_sequence=['#2ecc71', '#e74c3c'],
+                                  labels={target_col: 'Heart Disease', 'age': 'Age'})
+                fig.update_layout(barmode='overlay')
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Cholesterol Distribution
+            if 'chol' in df_viz.columns:
+                st.markdown("### 🩸 Cholesterol Levels by Heart Disease")
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    fig = px.box(df_viz, x=target_col, y='chol', color=target_col,
+                                title="Cholesterol Distribution",
+                                color_discrete_sequence=['#2ecc71', '#e74c3c'])
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    fig = px.violin(df_viz, x=target_col, y='chol', color=target_col,
+                                   title="Cholesterol Violin Plot",
+                                   color_discrete_sequence=['#2ecc71', '#e74c3c'],
+                                   box=True)
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            # Correlation Heatmap
+            st.markdown("### 🔥 Correlation Heatmap")
+            numeric_cols = df_viz.select_dtypes(include=[np.number]).columns
+            if len(numeric_cols) > 1:
+                correlation_matrix = df_viz[numeric_cols].corr()
+                fig = px.imshow(correlation_matrix, text_auto=True, aspect="auto",
+                                color_continuous_scale='RdBu_r',
+                                title="Feature Correlation Matrix")
+                fig.update_layout(height=600)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Additional Visualizations
+            st.markdown("### 📈 Additional Insights")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if 'thalach' in df_viz.columns:
+                    fig = px.histogram(df_viz, x='thalach', color=target_col, 
+                                      title="Maximum Heart Rate Distribution",
+                                      color_discrete_sequence=['#2ecc71', '#e74c3c'],
+                                      nbins=30)
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                if 'cp' in df_viz.columns:
+                    cp_counts = pd.crosstab(df_viz['cp'], df_viz[target_col], normalize='index') * 100
+                    fig = px.bar(cp_counts, title="Heart Disease Rate by Chest Pain Type",
+                                labels={'value': 'Percentage (%)', 'cp': 'Chest Pain Type'},
+                                color_discrete_sequence=['#2ecc71', '#e74c3c'],
+                                barmode='group')
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            # Scatter plot
+            if 'age' in df_viz.columns and 'thalach' in df_viz.columns:
+                st.markdown("### 📊 Age vs Max Heart Rate")
+                fig = px.scatter(df_viz, x='age', y='thalach', color=target_col,
+                                title="Age vs Maximum Heart Rate",
+                                color_discrete_sequence=['#2ecc71', '#e74c3c'])
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning(f"Target column '{target_col}' not found in dataset. Available columns: {list(df_viz.columns)}")
+            st.info("Please ensure your dataset has a target column (e.g., 'target', 'HeartDisease', etc.)")
     else:
-        st.warning("Target column not found in dataset. Cannot generate visualizations.")
+        st.warning("No data loaded. Please upload a dataset or use the default dataset.")
 
 # ==================== MODEL COMPARISON PAGE ====================
 elif page == "🧪 Model Comparison":
@@ -616,21 +641,25 @@ elif page == "🧪 Model Comparison":
         
         for idx, (model_name, model_data) in enumerate(st.session_state.results.items()):
             with tabs[idx]:
-                cm = confusion_matrix(model_data['y_test'], model_data['predictions'])
-                fig = px.imshow(cm, text_auto=True,
-                               labels=dict(x="Predicted", y="Actual"),
-                               x=['No Disease', 'Disease'],
-                               y=['No Disease', 'Disease'],
-                               title=f"{model_name} - Confusion Matrix",
-                               color_continuous_scale='Blues')
-                fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
+                col1, col2 = st.columns(2)
                 
-                # Classification report
-                report = classification_report(model_data['y_test'], model_data['predictions'], 
-                                              target_names=['No Disease', 'Disease'], output_dict=True)
-                report_df = pd.DataFrame(report).transpose()
-                st.dataframe(report_df.style.format('{:.3f}'), use_container_width=True)
+                with col1:
+                    cm = confusion_matrix(model_data['y_test'], model_data['predictions'])
+                    fig = px.imshow(cm, text_auto=True,
+                                   labels=dict(x="Predicted", y="Actual"),
+                                   x=['No Disease', 'Disease'],
+                                   y=['No Disease', 'Disease'],
+                                   title=f"{model_name} - Confusion Matrix",
+                                   color_continuous_scale='Blues')
+                    fig.update_layout(height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # Classification report
+                    report = classification_report(model_data['y_test'], model_data['predictions'], 
+                                                  target_names=['No Disease', 'Disease'], output_dict=True)
+                    report_df = pd.DataFrame(report).transpose()
+                    st.dataframe(report_df.style.format('{:.3f}'), use_container_width=True)
         
         # Model Recommendations
         st.markdown("### 💡 Model Selection Recommendation")
@@ -643,6 +672,8 @@ elif page == "🧪 Model Comparison":
             st.info(f"🏆 **Recommended Model: Logistic Regression**\n\nAccuracy: {best_accuracy:.3f} ({best_accuracy*100:.1f}%)")
         else:
             st.info(f"🏆 **Recommended Model: SVM**\n\nAccuracy: {best_accuracy:.3f} ({best_accuracy*100:.1f}%)")
+    else:
+        st.warning("No results available. Please check the data and retrain models.")
 
 # ==================== ABOUT PAGE ====================
 else:
@@ -659,6 +690,7 @@ else:
         st.markdown("### 🎯 Project Objective")
         st.markdown("""
         This project uses machine learning to predict heart disease risk using clinical parameters.
+        Early detection can significantly improve patient outcomes and reduce healthcare costs.
         """)
         
         st.markdown("### 🛠️ Technologies Used")
@@ -667,29 +699,70 @@ else:
         - **Machine Learning:** scikit-learn
         - **Data Processing:** Pandas, NumPy
         - **Visualization:** Plotly
+        - **Deployment:** Streamlit Cloud
         """)
         
         st.markdown("### 📊 Dataset Information")
         st.markdown("""
-        The dataset contains 13 clinical features for heart disease prediction.
+        The dataset contains 13 clinical features:
+        - Age, Sex, Chest Pain Type
+        - Resting Blood Pressure, Cholesterol
+        - Fasting Blood Sugar, Resting ECG
+        - Maximum Heart Rate, Exercise Angina
+        - ST Depression (Oldpeak), ST Slope
+        - Number of Major Vessels, Thalassemia
         """)
     
     with col2:
         st.markdown("### 🤖 Machine Learning Models")
         st.markdown("""
-        Three models are implemented:
+        Three models are implemented for comparison:
         
-        **1. Logistic Regression** - Baseline statistical model
-        **2. Random Forest** - Ensemble learning method
-        **3. Support Vector Machine (SVM)** - Effective for high-dimensional data
+        **1. Logistic Regression**
+        - Simple and interpretable
+        - Good baseline model
+        - Provides probability estimates
+        
+        **2. Random Forest**
+        - Ensemble learning method
+        - Handles non-linear relationships
+        - Provides feature importance
+        
+        **3. Support Vector Machine (SVM)**
+        - Effective in high dimensions
+        - Uses RBF kernel
+        - Good for complex decision boundaries
         """)
         
-        st.markdown("### 📈 Model Performance")
+        st.markdown("### 📈 Model Evaluation Metrics")
         st.markdown("""
-        Models are evaluated using Accuracy and Confusion Matrix.
+        Models are evaluated using:
+        - Accuracy Score
+        - Confusion Matrix
+        - Classification Report (Precision, Recall, F1-Score)
+        """)
+        
+        st.markdown("### 👨‍💻 Developer")
+        st.markdown("""
+        **Data Science Final Year Project**
+        
+        This system demonstrates the application of machine learning in healthcare
+        for early heart disease detection and prevention.
         """)
     
-    st.info("💡 **Note:** This system is for educational purposes only. Always consult healthcare professionals for medical advice.")
+    st.markdown("---")
+    st.markdown("### 📚 References")
+    st.markdown("""
+    - UCI Machine Learning Repository - Heart Disease Dataset
+    - American Heart Association Guidelines
+    - scikit-learn Documentation
+    - Streamlit Documentation
+    """)
+    
+    st.info("""
+    💡 **Note:** This system is for educational purposes only. 
+    Always consult healthcare professionals for medical advice.
+    """)
 
 # Footer
 st.markdown("---")
